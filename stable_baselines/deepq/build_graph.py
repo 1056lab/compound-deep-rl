@@ -320,7 +320,7 @@ def build_act_with_param_noise(q_func, ob_space, ac_space, stochastic_ph, update
 
 
 def build_train(q_func, ob_space, ac_space, optimizer, sess, grad_norm_clipping=None,
-                gamma=1.0, double_q=True, scope="deepq", reuse=None,
+                gamma=1.0, f=1.0, compound=False, double_q=True, scope="deepq", reuse=None,
                 param_noise=False, param_noise_filter_func=None, full_tensorboard_log=False):
     """
     Creates the train function:
@@ -333,6 +333,8 @@ def build_train(q_func, ob_space, ac_space, optimizer, sess, grad_norm_clipping=
     :param sess: (TensorFlow session) The current TensorFlow session
     :param grad_norm_clipping: (float) clip gradient norms to this value. If None no clipping is performed.
     :param gamma: (float) discount rate.
+    :param f: (float) betting fraction for compound RL.
+    :param compound: (bool) if true will be Compound Q Learning.
     :param double_q: (bool) if true will use Double Q Learning (https://arxiv.org/abs/1509.06461). In general it is a
         good idea to keep it enabled.
     :param scope: (str or VariableScope) optional scope for variable_scope.
@@ -405,7 +407,10 @@ def build_train(q_func, ob_space, ac_space, optimizer, sess, grad_norm_clipping=
         q_tp1_best_masked = (1.0 - done_mask_ph) * q_tp1_best
 
         # compute RHS of bellman equation
-        q_t_selected_target = rew_t_ph + gamma * q_tp1_best_masked
+        if compound:
+            q_t_selected_target = tf.math.log(1 + rew_t_ph * f) + gamma * q_tp1_best_masked
+        else:
+            q_t_selected_target = rew_t_ph + gamma * q_tp1_best_masked
 
         # compute the error (potentially clipped)
         td_error = q_t_selected - tf.stop_gradient(q_t_selected_target)
